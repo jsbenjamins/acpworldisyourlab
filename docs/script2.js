@@ -1,65 +1,60 @@
 const GITHUB_API_BASE = 'https://api.github.com/repos/jsbenjamins/acpworldisyourlab/contents';
+// const GITHUB_API_BASE = 'https://api.github.com/repos/yourusername/your-repo/contents';
 
-async function fetchDirectory(path) {
+async function fetchDirectoryContents(path) {
   const res = await fetch(`${GITHUB_API_BASE}/${path}`);
-  const data = await res.json();
-  if (!Array.isArray(data)) return [];
-
-  return data;
+  if (!res.ok) return [];
+  return await res.json();
 }
 
-async function getFileListWithSubfolders(basePath) {
-  const items = await fetchDirectory(basePath);
-  const files = [];
-  const folders = [];
+async function getFileTree(path) {
+  const items = await fetchDirectoryContents(path);
+  if (!Array.isArray(items)) return [];
+
+  const fileTree = [];
 
   for (const item of items) {
     if (item.type === 'file') {
-      files.push({
+      fileTree.push({
         name: item.name,
-        url: item.download_url
+        url: item.download_url,
+        isFolder: false
       });
     } else if (item.type === 'dir') {
-      folders.push(item);
+      const children = await getFileTree(`${path}/${item.name}`);
+      fileTree.push({
+        name: item.name,
+        isFolder: true,
+        children
+      });
     }
   }
 
-  // Recursively fetch subfolder contents
-  for (const folder of folders) {
-    const subItems = await getFileListWithSubfolders(`${basePath}/${folder.name}`);
-    files.push({
-      name: folder.name,
-      isFolder: true,
-      children: subItems
-    });
-  }
-
-  return files;
+  return fileTree;
 }
 
-function renderList(list, files) {
-  for (const item of files) {
+function renderFileTree(container, tree) {
+  for (const item of tree) {
     const li = document.createElement('li');
-
     if (item.isFolder) {
       li.innerHTML = `<strong>${item.name}</strong>`;
       const subUl = document.createElement('ul');
-      renderList(subUl, item.children);
+      renderFileTree(subUl, item.children);
       li.appendChild(subUl);
     } else {
       li.innerHTML = `<a href="${item.url}" target="_blank">${item.name}</a>`;
     }
-
-    list.appendChild(li);
+    container.appendChild(li);
   }
 }
 
-async function loadAndDisplay(folderName, listId) {
-  const files = await getFileListWithSubfolders(folderName);
-  const list = document.getElementById(listId);
-  list.innerHTML = '';
-  renderList(list, files);
+async function loadSection(rootFolder, listId) {
+  const tree = await getFileTree(rootFolder);
+  const ul = document.getElementById(listId);
+  ul.innerHTML = '';
+  renderFileTree(ul, tree);
 }
 
-loadAndDisplay('current', 'current-list');
-loadAndDisplay('past', 'past-list');
+// Load both sections
+loadSection('current', 'current-list');
+loadSection('past', 'past-list');
