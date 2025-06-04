@@ -29,7 +29,7 @@ async function getFileTree(path) {
       });
     }
   }
-
+  console.log(fileTree);
   return fileTree;
 }
 
